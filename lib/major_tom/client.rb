@@ -1,6 +1,7 @@
 require 'faye/websocket'
 require 'eventmachine'
 require 'json'
+require_relative 'command'
 
 module MajorTom
   class Client
@@ -81,8 +82,9 @@ module MajorTom
         message = JSON.parse(event.data)
         message_type = message["type"]
         if message_type == "command"
-          logger.debug("Command: #{message["command"]}") if logger
-          @command_block.call(message["command"]) if @command_block
+          command = Command.new(message["command"])
+          logger.debug("Command: #{command}") if logger
+          @command_block.call(command) if @command_block
         elsif message_type == "error"
           logger.warn("Error from Major Tom: #{message["error"]}") if logger
           @error_block.call(message["error"]) if @error_block
