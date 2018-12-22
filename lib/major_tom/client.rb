@@ -39,6 +39,34 @@ module MajorTom
       @error_block = block
     end
 
+    def command_status(command, options = {})
+      status = {
+        "id" => command.id,
+        "source" => options[:source] || options["source"] || "gateway"
+      }
+
+      if (errors = options["errors"] || options[:errors])
+        status["errors"] = errors
+      end
+
+      if (code = options["code"] || options[:code])
+        status["code"] = code
+      end
+
+      if (output = options["output"] || options[:output])
+        status["output"] = output
+      end
+
+      if (payload = options["payload"] || options[:payload])
+        status["payload"] = payload
+      end
+
+      transmit({
+        "type" => "command_status",
+        "command_status" => status
+      })
+    end
+
     def telemetry(entries)
       measurements = entries.map do |entry|
         {
@@ -52,12 +80,28 @@ module MajorTom
         }
       end
 
-      transmit(
+      transmit({
+        type: "measurements",
+        measurements: measurements
+      })
+    end
+
+    def log_messages(messages)
+      log_messages = messages.map do |entry|
         {
-          type: "measurements",
-          measurements: measurements
+          system: entry["system"] || entry[:system] || default_fields["system"] || default_fields[:system],
+          level: entry["level"] || entry[:level] || default_fields["level"] || default_fields[:level],
+          message: entry["message"] || entry[:message],
+
+          # Timestamp is expected to be millisecond unix epoch
+          timestamp: ((entry["timestamp"] || entry[:timestamp]).to_f * 1000).to_i
         }
-      )
+      end
+
+      transmit({
+        type: "log_messages",
+        log_messages: log_messages
+      })
     end
 
     def connect!

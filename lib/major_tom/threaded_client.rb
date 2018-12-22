@@ -15,6 +15,8 @@ module MajorTom
 
       @semaphore = Mutex.new
       @telemetry = []
+      @log_messages = []
+      @command_statuses = []
     end
 
     def on_hello(&block)
@@ -33,6 +35,20 @@ module MajorTom
       @semaphore.synchronize {
         @telemetry << entries
         @telemetry.pop if @telemetry.length > MAX_INTER_THREAD_QUEUE_LENGTH
+      }
+    end
+
+    def log_messages(entries)
+      @semaphore.synchronize {
+        @log_messages << entries
+        @log_messages.pop if @log_messages.length > MAX_INTER_THREAD_QUEUE_LENGTH
+      }
+    end
+
+    def command_status(command, options = {})
+      @semaphore.synchronize {
+        @command_statuses << [command, options]
+        @command_statuses.pop if @command_statuses.length > MAX_INTER_THREAD_QUEUE_LENGTH
       }
     end
 
@@ -66,9 +82,19 @@ module MajorTom
             client.connect!
 
             EM::add_periodic_timer(0.5) do
-              entries = @semaphore.synchronize { @telemetry.pop }
+              @semaphore.synchronize {
+                while (entries = @telemetry.pop)
+                  client.telemetry(entries)
+                end
 
-              client.telemetry(entries) if entries
+                while (entries = @log_messages.pop)
+                  client.log_messages(entries)
+                end
+
+                while (command_status = @command_statuses.pop)
+                  client.command_status(*command_status)
+                end
+              }
             end
           end
         rescue => e
