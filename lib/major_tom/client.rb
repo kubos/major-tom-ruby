@@ -7,7 +7,7 @@ module MajorTom
   class Client
     MAX_QUEUE_LENGTH = 1000
 
-    attr_reader :host, :gateway_token, :default_fields, :tls, :logger, :ws, :connected
+    attr_reader :host, :gateway_token, :default_fields, :tls, :logger, :connected
 
     # host: 'wss://your.majortom.host/'
     # gateway_token: '1234567890abcdefg'
@@ -105,35 +105,46 @@ module MajorTom
     end
 
     def connect!
-      # connect_timer = EventMachine.add_timer 30, proc {
-      #   if @ws && @ws.ready_state == Faye::WebSocket::Client::CONNECTING || @ws.ready_state == Faye::WebSocket::Client::CLOSED
-      #     p(@ws, @ws.status, @ws.ready_state)
-      #   end
-      # }
+      @ws = Faye::WebSocket::Client.new(host, nil, tls: tls, headers: { "X-Gateway-Token" => gateway_token })
 
-      @ws = Faye::WebSocket::Client.new(host, nil, ping: 20, tls: tls, headers: {
-        "X-Gateway-Token" => gateway_token
-      })
-
-      ws.on :open do |event|
+      @ws.on :open do |event|
         @connected = true
-        logger.debug("Connected") if logger
+        logger.info("Connected") if logger
+
+        # Setup ping
+        @ping_timer.cancel if @ping_timer
+        @ping_timeout_timer.cancel if @ping_timeout_timer
+        @ping_timer = EventMachine::PeriodicTimer.new(10) do
+          if @ws
+            @ping_timeout_timer = EventMachine::Timer.new(2) do
+              handle_disconnect("Ping timeout exceeded. Reconnecting in 30s.")
+            end
+
+            logger.debug("Pinging") if logger
+            @ws.ping 'detecting presence' do
+              logger.debug("Ping received.") if logger
+              @ping_timeout_timer.cancel if @ping_timeout_timer
+            end
+          else
+            logger.error("ws not defined in ping -- #{@connected}") if logger
+          end
+        end
       end
 
-      ws.on :message do |event|
+      @ws.on :message do |event|
         logger.debug("Got: #{event.data}") if logger
 
         message = JSON.parse(event.data)
         message_type = message["type"]
         if message_type == "command"
           command = Command.new(message["command"])
-          logger.debug("Command: #{command}") if logger
+          logger.info("Command: #{command}") if logger
           @command_block.call(command) if @command_block
         elsif message_type == "error"
           logger.warn("Error from Major Tom: #{message["error"]}") if logger
           @error_block.call(message["error"]) if @error_block
         elsif message_type == "hello"
-          logger.debug("Major Tom says hello: #{message}") if logger
+          logger.info("Major Tom says hello: #{message}") if logger
           empty_queue!
           @hello_block.call(message["hello"]) if @hello_block
         else
@@ -141,40 +152,53 @@ module MajorTom
         end
       end
 
-      ws.on :close do |event|
-        logger.warn("Closed - reconnecting in 5s") if logger
-        @connected = false
-        @ws = nil
-        EventMachine.add_timer 5, proc { connect! }
+      @ws.on :close do |event|
+        handle_disconnect("Closed - reconnecting in 30s")
       end
 
-      ws.on :warn do |event|
+      @ws.on :warn do |event|
         logger.error("WebSocket error: #{event.message}") if logger
       end
     end
 
     private
 
-    def transmit(message)
-      if ws && @connected
-        logger.debug("Sending: #{message.to_json}") if logger
-        ws.send(message.to_json)
-      else
-        @queue << message
+      def handle_disconnect(message)
+        if @connected
+          logger.warn(message) if logger
+          @ws.close if @ws
+          @connected = false
+          @ping_timer.cancel if @ping_timer
+          @ping_timeout_timer.cancel if @ping_timeout_timer
+          @ws = nil
 
-        if @queue.length > MAX_QUEUE_LENGTH
-          logger.warn("Queue maxed out at #{@queue.length > MAX_QUEUE_LENGTH} items") if logger
-          @queue.pop
+          @reconnect_timer.cancel if @reconnect_timer
+          @reconnect_timer = EventMachine::Timer.new(30) do
+            connect! unless @connected
+          end
         end
       end
-    end
 
-    def empty_queue!
-      logger.debug("Flushing #{@queue.length} queued item(s).") if !@queue.empty? && logger
+      def transmit(message)
+        if @ws && @connected
+          logger.debug("Sending: #{message.to_json}") if logger
+          @ws.send(message.to_json)
+        else
+          @queue << message
 
-      while !@queue.empty? && ws
-        transmit(@queue.pop)
+          if @queue.length > MAX_QUEUE_LENGTH
+            logger.warn("Queue maxed out at #{@queue.length > MAX_QUEUE_LENGTH} items") if logger
+            @queue.pop
+          end
+        end
       end
-    end
+
+      def empty_queue!
+        logger.info("Flushing #{@queue.length} queued item(s).") if !@queue.empty? && logger
+
+        while !@queue.empty? && @ws
+          transmit(@queue.pop)
+        end
+      end
   end
 end

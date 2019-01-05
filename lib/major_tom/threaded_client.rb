@@ -98,7 +98,12 @@ module MajorTom
             end
           end
         rescue => e
-          puts "Exception in MajorTom::ThreadedClient: #{e.message} - #{e.backtrace.join("\n")}"
+          message = "Exception in MajorTom::ThreadedClient: #{e.message} - #{e.backtrace.join("\n")}"
+          if logger
+            logger.error(message)
+          else
+            STDERR.puts message
+          end
         end
       end
     end
