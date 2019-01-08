@@ -105,6 +105,8 @@ module MajorTom
     end
 
     def connect!
+      logger.info("Connecting to #{host}") if logger
+
       @ws = Faye::WebSocket::Client.new(host, nil, tls: tls, headers: { "X-Gateway-Token" => gateway_token })
 
       @ws.on :open do |event|
@@ -115,18 +117,16 @@ module MajorTom
         @ping_timer.cancel if @ping_timer
         @ping_timeout_timer.cancel if @ping_timeout_timer
         @ping_timer = EventMachine::PeriodicTimer.new(10) do
-          if @ws
-            @ping_timeout_timer = EventMachine::Timer.new(2) do
-              handle_disconnect("Ping timeout exceeded. Reconnecting in 30s.")
-            end
+          @ping_timeout_timer = EventMachine::Timer.new(2) do
+            logger.warn("Ping timeout exceeded. Disconnecting...") if logger
+            @ping_timer.cancel if @ping_timer
+            @ws.close if @ws
+          end
 
-            logger.debug("Pinging") if logger
-            @ws.ping 'detecting presence' do
-              logger.debug("Ping received.") if logger
-              @ping_timeout_timer.cancel if @ping_timeout_timer
-            end
-          else
-            logger.error("ws not defined in ping -- #{@connected}") if logger
+          logger.debug("Pinging") if logger
+          @ws.ping 'detecting presence' do
+            logger.debug("Ping received.") if logger
+            @ping_timeout_timer.cancel if @ping_timeout_timer
           end
         end
       end
@@ -153,31 +153,25 @@ module MajorTom
       end
 
       @ws.on :close do |event|
-        handle_disconnect("Closed - reconnecting in 30s")
+        logger.warn("Connection closed") if logger
+        @connected = false
+        @ping_timer.cancel if @ping_timer
+        @ping_timeout_timer.cancel if @ping_timeout_timer
+        @reconnect_timer.cancel if @reconnect_timer
+        @ws = nil
+
+        logger.warn("Reconnecting in 30s") if logger
+        @reconnect_timer = EventMachine::Timer.new(30) do
+          connect! unless @connected
+        end
       end
 
-      @ws.on :warn do |event|
+      @ws.on :error do |event|
         logger.error("WebSocket error: #{event.message}") if logger
       end
     end
 
     private
-
-      def handle_disconnect(message)
-        if @connected
-          logger.warn(message) if logger
-          @ws.close if @ws
-          @connected = false
-          @ping_timer.cancel if @ping_timer
-          @ping_timeout_timer.cancel if @ping_timeout_timer
-          @ws = nil
-
-          @reconnect_timer.cancel if @reconnect_timer
-          @reconnect_timer = EventMachine::Timer.new(30) do
-            connect! unless @connected
-          end
-        end
-      end
 
       def transmit(message)
         if @ws && @connected
@@ -187,7 +181,7 @@ module MajorTom
           @queue << message
 
           if @queue.length > MAX_QUEUE_LENGTH
-            logger.warn("Queue maxed out at #{@queue.length > MAX_QUEUE_LENGTH} items") if logger
+            logger.warn("Queue maxed out at #{MAX_QUEUE_LENGTH} items") if logger
             @queue.pop
           end
         end
