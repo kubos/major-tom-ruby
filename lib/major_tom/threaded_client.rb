@@ -5,18 +5,18 @@ module MajorTom
   class ThreadedClient
     MAX_INTER_THREAD_QUEUE_LENGTH = 1000
 
-    attr_accessor :host, :gateway_token, :default_fields, :logger, :client
+    attr_accessor :uri, :gateway_token, :default_fields, :logger, :client
 
-    def initialize(host:, gateway_token:, default_fields: {}, logger: nil)
-      @host = host
+    def initialize(uri:, gateway_token:, default_fields: {}, logger: nil)
+      @uri = uri
       @gateway_token = gateway_token
       @default_fields = default_fields
       @logger = logger
 
       @semaphore = Mutex.new
       @telemetry = []
-      @log_messages = []
-      @command_statuses = []
+      @events = []
+      @command_updates = []
     end
 
     def on_hello(&block)
@@ -38,17 +38,17 @@ module MajorTom
       }
     end
 
-    def log_messages(entries)
+    def events(entries)
       @semaphore.synchronize {
-        @log_messages << entries
-        @log_messages.pop if @log_messages.length > MAX_INTER_THREAD_QUEUE_LENGTH
+        @events << entries
+        @events.pop if @events.length > MAX_INTER_THREAD_QUEUE_LENGTH
       }
     end
 
-    def command_status(command, options = {})
+    def command_update(command, options = {})
       @semaphore.synchronize {
-        @command_statuses << [command, options]
-        @command_statuses.pop if @command_statuses.length > MAX_INTER_THREAD_QUEUE_LENGTH
+        @command_updates << [command, options]
+        @command_updates.pop if @command_updates.length > MAX_INTER_THREAD_QUEUE_LENGTH
       }
     end
 
@@ -61,7 +61,7 @@ module MajorTom
         begin
           EM.run do
             @client = MajorTom::Client.new(
-              host: host,
+              uri: uri,
               gateway_token: gateway_token,
               default_fields: default_fields,
               logger: logger
@@ -87,12 +87,12 @@ module MajorTom
                   client.telemetry(entries)
                 end
 
-                while (entries = @log_messages.pop)
-                  client.log_messages(entries)
+                while (entries = @events.pop)
+                  client.events(entries)
                 end
 
-                while (command_status = @command_statuses.pop)
-                  client.command_status(*command_status)
+                while (command_update = @command_updates.pop)
+                  client.command_update(*command_update)
                 end
               }
             end

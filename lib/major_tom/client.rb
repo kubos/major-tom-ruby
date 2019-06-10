@@ -7,17 +7,17 @@ module MajorTom
   class Client
     MAX_QUEUE_LENGTH = 1000
 
-    attr_reader :host, :gateway_token, :default_fields, :tls, :logger, :connected
+    attr_reader :uri, :gateway_token, :default_fields, :tls, :logger, :connected
 
-    # host: 'wss://your.majortom.host/'
+    # uri: 'wss://your.majortom.host/gateway_api/v1.0'
     # gateway_token: '1234567890abcdefg'
     # tls:
     #   private_key_file: '/tmp/server.key',
     #   cert_chain_file: '/tmp/server.crt',
     #   verify_peer: false
     # logger: Logger.new(STDOUT)
-    def initialize(host:, gateway_token:, default_fields: {}, tls: {}, logger: nil)
-      @host = host
+    def initialize(uri:, gateway_token:, default_fields: {}, tls: {}, logger: nil)
+      @uri = uri
       @gateway_token = gateway_token
       @default_fields = default_fields
       @tls = tls
@@ -39,31 +39,22 @@ module MajorTom
       @error_block = block
     end
 
-    def command_status(command, options = {})
-      status = {
-        "id" => command.id,
-        "source" => options[:source] || options["source"] || "gateway"
+    def command_update(command, options = {})
+      command_info = {
+        "id" => command.id
       }
 
-      if (errors = options["errors"] || options[:errors])
-        status["errors"] = errors
-      end
-
-      if (code = options["code"] || options[:code])
-        status["code"] = code
-      end
-
-      if (output = options["output"] || options[:output])
-        status["output"] = output
-      end
-
-      if (payload = options["payload"] || options[:payload])
-        status["payload"] = payload
+      %w[state payload status output errors
+         progress_1_current progress_1_max progress_1_label
+         progress_2_current progress_2_max progress_2_label].each do |field|
+        if (value = options[field] || options[field.to_sym])
+          command_info[field] = value
+        end
       end
 
       transmit({
-        "type" => "command_status",
-        "command_status" => status
+        "type" => "command_update",
+        "command" => command_info
       })
     end
 
@@ -76,7 +67,7 @@ module MajorTom
           value: entry["value"] || entry[:value],
 
           # Timestamp is expected to be millisecond unix epoch
-          timestamp: ((entry["timestamp"] || entry[:timestamp]).to_f * 1000).to_i
+          timestamp: ((entry["timestamp"] || entry[:timestamp] || Time.now).to_f * 1000).to_i
         }
       end
 
@@ -86,28 +77,31 @@ module MajorTom
       })
     end
 
-    def log_messages(messages)
-      log_messages = messages.map do |entry|
+    def events(messages)
+      events = messages.map do |entry|
         {
           system: entry["system"] || entry[:system] || default_fields["system"] || default_fields[:system],
-          level: entry["level"] || entry[:level] || default_fields["level"] || default_fields[:level],
+          type: entry["type"] || entry[:type] || default_fields["type"] || default_fields[:type],
           message: entry["message"] || entry[:message],
+          level: entry["level"] || entry[:level] || default_fields["level"] || default_fields[:level],
+          command_id: entry["command_id"] || entry[:command_id],
+          debug: entry["debug"] || entry[:debug],
 
           # Timestamp is expected to be millisecond unix epoch
-          timestamp: ((entry["timestamp"] || entry[:timestamp]).to_f * 1000).to_i
+          timestamp: ((entry["timestamp"] || entry[:timestamp] || Time.now).to_f * 1000).to_i
         }
       end
 
       transmit({
-        type: "log_messages",
-        log_messages: log_messages
+        type: "events",
+        events: events
       })
     end
 
     def connect!
-      logger.info("Connecting to #{host}") if logger
+      logger.info("Connecting to #{uri}") if logger
 
-      @ws = Faye::WebSocket::Client.new(host, nil, tls: tls, headers: { "X-Gateway-Token" => gateway_token })
+      @ws = Faye::WebSocket::Client.new(uri, nil, tls: tls, headers: { "X-Gateway-Token" => gateway_token })
 
       @ws.on :open do |event|
         @connected = true

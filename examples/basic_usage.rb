@@ -5,18 +5,18 @@ require 'logger'
 # The MajorTom::Client uses eventmachine and expects you to start the reactor wherever is appropriate for your application.
 
 # Example usage:
-# MT_HOST=wss://your.majortom.host/ MT_GATEWAY_TOKEN=1234567890abcdefg ruby basic_usage.rb
+# MT_URI=wss://your.majortom.host/gateway_api/v1.0 MT_GATEWAY_TOKEN=1234567890abcdefg ruby basic_usage.rb
 
-host = ENV['MT_HOST']
+uri = ENV['MT_URI']
 gateway_token = ENV['MT_GATEWAY_TOKEN']
-default_system = 'some-satellite'
+default_system = ENV['MT_SYSTEM'] || 'some-satellite'
 
 EM.run do
   logger = Logger.new(STDOUT)
   logger.level = Logger::DEBUG
 
   client = MajorTom::Client.new(
-    host: host,
+    uri: uri,
     gateway_token: gateway_token,
     logger: logger,
     default_fields: { system: default_system }

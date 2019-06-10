@@ -1,5 +1,5 @@
 > This is a work-in-progress and is **incomplete**.
 
-# MajorTom Ruby
+# MajorTom Ruby Gateway
 
 [See Examples](/examples)
