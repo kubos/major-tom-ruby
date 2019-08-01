@@ -182,7 +182,7 @@ module MajorTom
           @queue << message
 
           if @queue.length > MAX_QUEUE_LENGTH
-            logger.warn("Queue maxed out at #{MAX_QUEUE_LENGTH} items") if logger
+            logger.warn("Major Tom Client local queue maxed out at #{MAX_QUEUE_LENGTH} items") if logger
             @queue.pop
           end
         end
