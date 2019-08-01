@@ -34,6 +34,10 @@ EM.run do
     p error
   end
 
+  client.on_rate_limit do |rate_limit|
+    p rate_limit
+  end
+
   client.connect!
 
   client.telemetry([

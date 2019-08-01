@@ -16,7 +16,7 @@ module MajorTom
     #   cert_chain_file: '/tmp/server.crt',
     #   verify_peer: false
     # logger: Logger.new(STDOUT)
-    def initialize(uri:, gateway_token:, default_fields: {}, tls: {}, logger: nil)
+    def initialize(uri:, gateway_token:, default_fields: {}, tls: {}, logger: Logger.new(STDOUT))
       @uri = uri
       @gateway_token = gateway_token
       @default_fields = default_fields
@@ -37,6 +37,10 @@ module MajorTom
 
     def on_error(&block)
       @error_block = block
+    end
+
+    def on_rate_limit(&block)
+      @rate_limit_block = block
     end
 
     def command_update(command, options = {})
@@ -137,6 +141,9 @@ module MajorTom
         elsif message_type == "error"
           logger.warn("Error from Major Tom: #{message["error"]}") if logger
           @error_block.call(message["error"]) if @error_block
+        elsif message_type == "rate_limit"
+          logger.warn("Rate limit from Major Tom: #{message["rate_limit"]}") if logger
+          @rate_limit_block.call(message["rate_limit"]) if @rate_limit_block
         elsif message_type == "hello"
           logger.info("Major Tom says hello: #{message}") if logger
           empty_queue!

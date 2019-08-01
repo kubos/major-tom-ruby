@@ -21,6 +21,14 @@ major_tom = MajorTom::ThreadedClient.new(
   default_fields: { system: default_system, level: "nominal" }
 )
 
+major_tom.on_error do |error|
+  p error
+end
+
+major_tom.on_rate_limit do |rate_limit|
+  p rate_limit
+end
+
 major_tom.on_command do |command|
   p command
   major_tom.command_update(command, state: "preparing_on_gateway", status: "Command received by gateway. I'll do something now...")
