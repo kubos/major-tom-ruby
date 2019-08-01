@@ -34,21 +34,30 @@ module MajorTom
     def telemetry(entries)
       @semaphore.synchronize {
         @telemetry << entries
-        @telemetry.pop if @telemetry.length > MAX_INTER_THREAD_QUEUE_LENGTH
+        if @telemetry.length > MAX_INTER_THREAD_QUEUE_LENGTH
+          @telemetry.pop
+          logger.warn "Oldest buffered telemetry discarded due to buffer reaching max size of #{MAX_INTER_THREAD_QUEUE_LENGTH}."
+        end
       }
     end
 
     def events(entries)
       @semaphore.synchronize {
         @events << entries
-        @events.pop if @events.length > MAX_INTER_THREAD_QUEUE_LENGTH
+        if @events.length > MAX_INTER_THREAD_QUEUE_LENGTH
+          @events.pop
+          logger.warn "Oldest buffered event discarded due to buffer reaching max size of #{MAX_INTER_THREAD_QUEUE_LENGTH}."
+        end
       }
     end
 
     def command_update(command, options = {})
       @semaphore.synchronize {
         @command_updates << [command, options]
-        @command_updates.pop if @command_updates.length > MAX_INTER_THREAD_QUEUE_LENGTH
+        if @command_updates.length > MAX_INTER_THREAD_QUEUE_LENGTH
+          @command_updates.pop
+          logger.warn "Oldest buffered command update discarded due to buffer reaching max size of #{MAX_INTER_THREAD_QUEUE_LENGTH}."
+        end
       }
     end
 
