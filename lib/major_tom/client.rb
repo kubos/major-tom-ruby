@@ -5,7 +5,7 @@ require_relative 'command'
 
 module MajorTom
   class Client
-    MAX_QUEUE_LENGTH = 1000
+    MAX_QUEUE_LENGTH = 10_000
 
     attr_reader :uri, :gateway_token, :default_fields, :tls, :logger, :connected
 
@@ -193,6 +193,7 @@ module MajorTom
 
         while !@queue.empty? && @ws
           transmit(@queue.pop)
+          sleep 0.5 # Avoid hitting rate limit
         end
       end
   end
