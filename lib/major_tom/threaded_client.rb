@@ -73,6 +73,10 @@ module MajorTom
       @thread = Thread.new do
         begin
           EM.run do
+            EM.error_handler{ |e|
+              logger.error "Error raised during event loop: #{e.message}\n#{e.backtrace.join("\n")}"
+            }
+
             @client = MajorTom::Client.new(
               uri: uri,
               gateway_token: gateway_token,
