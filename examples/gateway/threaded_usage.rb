@@ -1,8 +1,8 @@
 require 'bundler/setup'
-require 'major_tom/threaded_client'
+require 'major_tom/gateway/threaded_client'
 require 'logger'
 
-# The MajorTom::ThreadedClient wraps eventmachine in a Thread and manages it.
+# The MajorTom::Gateway::ThreadedClient wraps eventmachine in a Thread and manages it.
 
 # Example usage:
 # MT_URI=wss://your.majortom.host/gateway_api/v1.0 MT_GATEWAY_TOKEN=1234567890abcdefg ruby threaded_usage.rb
@@ -14,7 +14,7 @@ default_system = ENV['MT_SYSTEM'] || 'some-satellite'
 logger = Logger.new(STDOUT)
 logger.level = Logger::DEBUG
 
-major_tom = MajorTom::ThreadedClient.new(
+major_tom = MajorTom::Gateway::ThreadedClient.new(
   uri: uri,
   gateway_token: gateway_token,
   logger: logger,

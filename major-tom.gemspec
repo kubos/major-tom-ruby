@@ -41,4 +41,5 @@ Gem::Specification.new do |spec|
   spec.add_development_dependency "rspec", "~> 3.0"
 
   spec.add_dependency "faye-websocket", "~> 0.10"
+  spec.add_dependency "faraday", "< 1.0"
 end

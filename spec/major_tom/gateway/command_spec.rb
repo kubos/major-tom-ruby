@@ -1,8 +1,8 @@
-require 'major_tom/command'
+require 'major_tom/gateway/command'
 
-RSpec.describe MajorTom::Command do
+RSpec.describe MajorTom::Gateway::Command do
   let(:command) {
-    MajorTom::Command.new(
+    MajorTom::Gateway::Command.new(
       {
       "id" => 6,
       "type" => "testing",

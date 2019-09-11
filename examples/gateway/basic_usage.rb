@@ -1,8 +1,8 @@
 require 'bundler/setup'
-require 'major_tom/client'
+require 'major_tom/gateway/client'
 require 'logger'
 
-# The MajorTom::Client uses eventmachine and expects you to start the reactor wherever is appropriate for your application.
+# The MajorTom::Gateway::Client uses eventmachine and expects you to start the reactor wherever is appropriate for your application.
 
 # Example usage:
 # MT_URI=wss://your.majortom.host/gateway_api/v1.0 MT_GATEWAY_TOKEN=1234567890abcdefg ruby basic_usage.rb
@@ -15,7 +15,7 @@ EM.run do
   logger = Logger.new(STDOUT)
   logger.level = Logger::DEBUG
 
-  client = MajorTom::Client.new(
+  client = MajorTom::Gateway::Client.new(
     uri: uri,
     gateway_token: gateway_token,
     logger: logger,
