@@ -3,48 +3,55 @@ require 'faraday'
 
 module MajorTom
   module Script
+    class ScriptError < StandardError
+    end
+
+    class ScriptDisabledError < ScriptError
+    end
+
+    class ScriptRateLimitError < ScriptError
+      attr_reader :reset_after, :retry_after, :errors
+
+      def initialize(reset_after, retry_after, errors)
+        @reset_after, @retry_after, @errors = reset_after, retry_after, errors
+      end
+
+      def to_s
+        "<ScriptRateLimitError reset_after='#{reset_after}' retry_after='#{retry_after}' errors='#{errors}'>"
+      end
+    end
+
+    class ScriptTokenInvalidError < ScriptError
+    end
+
+    class InvalidScriptResponse < ScriptError
+    end
+
+    class ScriptQueryError < ScriptError
+      attr_reader :response, :errors
+
+      def initialize(response, errors)
+        @response, @errors = response, errors
+      end
+
+      def to_s
+        "<ScriptQueryError response='#{response}' errors='#{errors}'>"
+      end
+    end
+
+    class UnknownObjectError < ScriptError
+      attr_reader :object, :name, :parent, :id
+
+      def initialize(object:, name: nil, parent: nil, id: nil)
+        @object, @name, @parent, @id = object, name, parent, id
+      end
+
+      def to_s
+        "<UnknownObjectError object='#{object}' name='#{name}' parent='#{parent}' id='#{id}'>"
+      end
+    end
+
     class Client
-
-      # Errors
-
-      class ScriptError < StandardError
-      end
-
-      class ScriptDisabledError < ScriptError
-      end
-
-      class ScriptRateLimitError < ScriptError
-        attr_reader :reset_after, :retry_after, :errors
-
-        def initialize(reset_after, retry_after, errors)
-          @reset_after, @retry_after, @errors = reset_after, retry_after, errors
-        end
-      end
-
-      class ScriptTokenInvalidError < ScriptError
-      end
-
-      class InvalidScriptResponse < ScriptError
-      end
-
-      class ScriptQueryError < ScriptError
-        attr_reader :request, :errors
-
-        def initialize(request, errors)
-          @request, @errors = request, errors
-        end
-      end
-
-      class UnknownObjectError < ScriptError
-        attr_reader :object, :name, :parent, :id
-
-        def initialize(object:, name: nil, parent: nil, id: nil)
-          @object, @name, @parent, @id = object, name, parent, id
-        end
-      end
-
-      # Client
-
       attr_reader :uri, :script_token, :ssl, :logger, :basic_auth_username, :basic_auth_password
 
       # uri: 'https://your.majortom.host'
