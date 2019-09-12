@@ -17,5 +17,5 @@ client = MajorTom::Script::Client.new(
   logger: logger
 )
 
-system = client.system(id: 1, return_fields: ['metrics { nodes { name } }'])
+system = client.system(id: 1, return_fields: ['metrics { nodes { name, latest { timestamp, value } } }'])
 p system
