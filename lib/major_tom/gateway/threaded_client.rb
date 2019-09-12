@@ -1,4 +1,4 @@
-require 'major_tom/client'
+require_relative 'client'
 require 'thread'
 
 module MajorTom
