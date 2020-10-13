@@ -69,7 +69,7 @@ module MajorTom
       @thread && @thread.join
     end
 
-    def connect!
+    def connect!(&block)
       @thread = Thread.new do
         begin
           EM.run do
@@ -117,6 +117,8 @@ module MajorTom
                 end
               }
             end
+
+            yield if block
           end
         rescue => e
           message = "Exception in MajorTom::ThreadedClient: #{e.message} - #{e.backtrace.join("\n")}"
