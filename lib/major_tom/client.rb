@@ -43,6 +43,10 @@ module MajorTom
       @rate_limit_block = block
     end
 
+    def on_transit(&block)
+      @transit_block = block
+    end
+
     def command_update(command, options = {})
       command_info = {
         "id" => command.id
@@ -144,6 +148,9 @@ module MajorTom
         elsif message_type == "rate_limit"
           logger.warn("Rate limit from Major Tom: #{message["rate_limit"]}") if logger
           @rate_limit_block.call(message["rate_limit"]) if @rate_limit_block
+        elsif message_type == "transit"
+          logger.info("Transit advistory from Major Tom: #{message["transit"]}") if logger
+          @transit_block.call(message["transit"]) if @transit_block
         elsif message_type == "hello"
           logger.info("Major Tom says hello: #{message}") if logger
           empty_queue!

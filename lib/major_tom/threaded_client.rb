@@ -35,6 +35,10 @@ module MajorTom
       @rate_limit_block = block
     end
 
+    def on_transit(&block)
+      @transit_block = block
+    end
+
     def telemetry(entries)
       @semaphore.synchronize {
         @telemetry << entries
@@ -98,6 +102,10 @@ module MajorTom
 
             client.on_rate_limit do |rate_limit|
               @rate_limit_block.call(rate_limit) if @rate_limit_block
+            end
+
+            client.on_transit do |transit|
+              @transit_block.call(transit) if @transit_block
             end
 
             client.connect!
