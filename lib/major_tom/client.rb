@@ -1,13 +1,14 @@
 require 'faye/websocket'
 require 'eventmachine'
 require 'json'
+require 'base64'
 require_relative 'command'
 
 module MajorTom
   class Client
     MAX_QUEUE_LENGTH = 10_000
 
-    attr_reader :uri, :gateway_token, :default_fields, :tls, :logger, :connected
+    attr_reader :uri, :gateway_token, :default_fields, :tls, :basic_auth, :logger, :connected
 
     # uri: 'wss://your.majortom.host/gateway_api/v1.0'
     # gateway_token: '1234567890abcdefg'
@@ -16,11 +17,12 @@ module MajorTom
     #   cert_chain_file: '/tmp/server.crt',
     #   verify_peer: false
     # logger: Logger.new(STDOUT)
-    def initialize(uri:, gateway_token:, default_fields: {}, tls: {}, logger: Logger.new(STDOUT))
+    def initialize(uri:, gateway_token:, default_fields: {}, tls: {}, basic_auth: nil, logger: Logger.new(STDOUT))
       @uri = uri
       @gateway_token = gateway_token
       @default_fields = default_fields
       @tls = tls
+      @basic_auth = basic_auth
       @logger = logger
       @queue = []
       @connected = false
@@ -109,7 +111,11 @@ module MajorTom
     def connect!
       logger.info("Connecting to #{uri}") if logger
 
-      @ws = Faye::WebSocket::Client.new(uri, nil, tls: tls, headers: { "X-Gateway-Token" => gateway_token })
+      headers = { "X-Gateway-Token" => gateway_token }
+      if basic_auth
+        headers["Authorization"] = "Basic #{Base64.strict_encode64(basic_auth)}"
+      end
+      @ws = Faye::WebSocket::Client.new(uri, nil, tls: tls, headers: headers)
 
       @ws.on :open do |event|
         @connected = true

@@ -5,12 +5,13 @@ module MajorTom
   class ThreadedClient
     MAX_INTER_THREAD_QUEUE_LENGTH = 1000
 
-    attr_accessor :uri, :gateway_token, :default_fields, :logger, :client
+    attr_accessor :uri, :gateway_token, :default_fields, :basic_auth, :logger, :client
 
-    def initialize(uri:, gateway_token:, default_fields: {}, logger: nil)
+    def initialize(uri:, gateway_token:, default_fields: {}, basic_auth: nil, logger: nil)
       @uri = uri
       @gateway_token = gateway_token
       @default_fields = default_fields
+      @basic_auth = basic_auth
       @logger = logger
 
       @semaphore = Mutex.new
@@ -85,6 +86,7 @@ module MajorTom
               uri: uri,
               gateway_token: gateway_token,
               default_fields: default_fields,
+              basic_auth: basic_auth,
               logger: logger
             )
 
