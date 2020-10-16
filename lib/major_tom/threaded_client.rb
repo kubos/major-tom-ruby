@@ -74,6 +74,11 @@ module MajorTom
       @thread && @thread.join
     end
 
+    def disconnect!
+      @client.disconnect! if @client
+      @thread.terminate if @thread && @thread != Thread.current && @thread.alive?
+    end
+
     def connect!(&block)
       @thread = Thread.new do
         begin

@@ -108,6 +108,13 @@ module MajorTom
       })
     end
 
+    def disconnect!
+      @ping_timer.cancel if @ping_timer
+      @ping_timeout_timer.cancel if @ping_timeout_timer
+      @ws.close if @ws
+      @connected = false
+    end
+
     def connect!
       logger.info("Connecting to #{uri}") if logger
 
@@ -174,10 +181,10 @@ module MajorTom
         @reconnect_timer.cancel if @reconnect_timer
         @ws = nil
 
-        logger.warn("Reconnecting in 30s") if logger
-        @reconnect_timer = EventMachine::Timer.new(30) do
-          connect! unless @connected
-        end
+        # logger.warn("Reconnecting in 30s") if logger
+        # @reconnect_timer = EventMachine::Timer.new(30) do
+        #   connect! unless @connected
+        # end
       end
 
       @ws.on :error do |event|
