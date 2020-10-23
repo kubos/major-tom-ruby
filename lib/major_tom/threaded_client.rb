@@ -70,12 +70,28 @@ module MajorTom
       }
     end
 
+    def command_definitions_update(definitions, system = nil)
+      @semaphore.synchronize {
+        @command_updates << [
+            "command_definitions_update",
+            {
+                definitions: definitions,
+                system: system
+            }
+        ]
+        if @command_updates.length > MAX_INTER_THREAD_QUEUE_LENGTH
+          @command_updates.pop
+          logger.warn "Oldest buffered command update discarded due to buffer reaching max size of #{MAX_INTER_THREAD_QUEUE_LENGTH}."
+        end
+      }
+    end
+
     def join
       @thread && @thread.join
     end
 
     def disconnect!
-      @client.disconnect! if @client
+      client.disconnect! if client
       @thread.terminate if @thread && @thread != Thread.current && @thread.alive?
     end
 
@@ -128,7 +144,14 @@ module MajorTom
                 end
 
                 while (command_update = @command_updates.pop)
-                  client.command_update(*command_update)
+                  if command_update[0] == "command_definitions_update"
+                    client.command_definitions_update(
+                        command_update[1][:definitions],
+                        command_update[1][:system]
+                    )
+                  else
+                    client.command_update(*command_update)
+                  end
                 end
               }
             end

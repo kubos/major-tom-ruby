@@ -51,7 +51,7 @@ module MajorTom
 
     def command_update(command, options = {})
       command_info = {
-        "id" => command.id
+        'id' => command.id
       }
 
       %w[state payload status output errors
@@ -62,50 +62,60 @@ module MajorTom
         end
       end
 
-      transmit({
-        "type" => "command_update",
-        "command" => command_info
-      })
+      transmit(
+        'type' => 'command_update',
+        'command' => command_info
+      )
     end
 
     def telemetry(entries)
       measurements = entries.map do |entry|
         {
-          system: entry["system"] || entry[:system] || default_fields["system"] || default_fields[:system],
-          subsystem: entry["subsystem"] || entry[:subsystem] || default_fields["subsystem"] || default_fields[:subsystem],
-          metric: entry["metric"] || entry[:metric] || default_fields["metric"] || default_fields[:metric],
-          value: entry["value"] || entry[:value],
+          system: entry['system'] || entry[:system] || default_fields['system'] || default_fields[:system],
+          subsystem: entry['subsystem'] || entry[:subsystem] || default_fields['subsystem'] || default_fields[:subsystem],
+          metric: entry['metric'] || entry[:metric] || default_fields['metric'] || default_fields[:metric],
+          value: entry['value'] || entry[:value],
 
           # Timestamp is expected to be millisecond unix epoch
-          timestamp: ((entry["timestamp"] || entry[:timestamp] || Time.now).to_f * 1000).to_i
+          timestamp: ((entry['timestamp'] || entry[:timestamp] || Time.now).to_f * 1000).to_i
         }
       end
 
-      transmit({
-        type: "measurements",
+      transmit(
+        type: 'measurements',
         measurements: measurements
-      })
+      )
     end
 
     def events(messages)
       events = messages.map do |entry|
         {
-          system: entry["system"] || entry[:system] || default_fields["system"] || default_fields[:system],
-          type: entry["type"] || entry[:type] || default_fields["type"] || default_fields[:type],
-          message: entry["message"] || entry[:message],
-          level: entry["level"] || entry[:level] || default_fields["level"] || default_fields[:level],
-          command_id: entry["command_id"] || entry[:command_id],
-          debug: entry["debug"] || entry[:debug],
+          system: entry['system'] || entry[:system] || default_fields['system'] || default_fields[:system],
+          type: entry['type'] || entry[:type] || default_fields['type'] || default_fields[:type],
+          message: entry['message'] || entry[:message],
+          level: entry['level'] || entry[:level] || default_fields['level'] || default_fields[:level],
+          command_id: entry['command_id'] || entry[:command_id],
+          debug: entry['debug'] || entry[:debug],
 
           # Timestamp is expected to be millisecond unix epoch
-          timestamp: ((entry["timestamp"] || entry[:timestamp] || Time.now).to_f * 1000).to_i
+          timestamp: ((entry['timestamp'] || entry[:timestamp] || Time.now).to_f * 1000).to_i
         }
       end
 
-      transmit({
-        type: "events",
+      transmit(
+        type: 'events',
         events: events
-      })
+      )
+    end
+
+    def command_definitions_update(definitions, system = nil)
+      transmit(
+        type: 'command_definitions_update',
+        command_definitions: {
+          system: system || default_fields['system'] || default_fields[:system],
+          definitions: definitions
+        }
+      )
     end
 
     def disconnect!
@@ -118,29 +128,29 @@ module MajorTom
     def connect!
       logger.info("Connecting to #{uri}") if logger
 
-      headers = { "X-Gateway-Token" => gateway_token }
+      headers = { 'X-Gateway-Token' => gateway_token }
       if basic_auth
-        headers["Authorization"] = "Basic #{Base64.strict_encode64(basic_auth)}"
+        headers['Authorization'] = "Basic #{Base64.strict_encode64(basic_auth)}"
       end
       @ws = Faye::WebSocket::Client.new(uri, nil, tls: tls, headers: headers)
 
       @ws.on :open do |event|
         @connected = true
-        logger.info("Connected") if logger
+        logger.info('Connected') if logger
 
         # Setup ping
         @ping_timer.cancel if @ping_timer
         @ping_timeout_timer.cancel if @ping_timeout_timer
         @ping_timer = EventMachine::PeriodicTimer.new(10) do
           @ping_timeout_timer = EventMachine::Timer.new(2) do
-            logger.warn("Ping timeout exceeded. Disconnecting...") if logger
+            logger.warn('Ping timeout exceeded. Disconnecting...') if logger
             @ping_timer.cancel if @ping_timer
             @ws.close if @ws
           end
 
-          logger.debug("Pinging") if logger
+          logger.debug('Pinging') if logger
           @ws.ping 'detecting presence' do
-            logger.debug("Ping received.") if logger
+            logger.debug('Ping received.') if logger
             @ping_timeout_timer.cancel if @ping_timeout_timer
           end
         end
@@ -150,31 +160,31 @@ module MajorTom
         logger.debug("Got: #{event.data}") if logger
 
         message = JSON.parse(event.data)
-        message_type = message["type"]
-        if message_type == "command"
-          command = Command.new(message["command"])
+        message_type = message['type']
+        if message_type == 'command'
+          command = Command.new(message['command'])
           logger.info("Command: #{command}") if logger
           @command_block.call(command) if @command_block
-        elsif message_type == "error"
+        elsif message_type == 'error'
           logger.warn("Error from Major Tom: #{message["error"]}") if logger
-          @error_block.call(message["error"]) if @error_block
-        elsif message_type == "rate_limit"
+          @error_block.call(message['error']) if @error_block
+        elsif message_type == 'rate_limit'
           logger.warn("Rate limit from Major Tom: #{message["rate_limit"]}") if logger
-          @rate_limit_block.call(message["rate_limit"]) if @rate_limit_block
-        elsif message_type == "transit"
+          @rate_limit_block.call(message['rate_limit']) if @rate_limit_block
+        elsif message_type == 'transit'
           logger.info("Transit advistory from Major Tom: #{message["transit"]}") if logger
-          @transit_block.call(message["transit"]) if @transit_block
-        elsif message_type == "hello"
+          @transit_block.call(message['transit']) if @transit_block
+        elsif message_type == 'hello'
           logger.info("Major Tom says hello: #{message}") if logger
           empty_queue!
-          @hello_block.call(message["hello"]) if @hello_block
+          @hello_block.call(message['hello']) if @hello_block
         else
           logger.error("Unknown message type #{message_type} received from Major Tom: #{message}") if logger
         end
       end
 
       @ws.on :close do |event|
-        logger.warn("Connection closed") if logger
+        logger.warn('Connection closed') if logger
         @connected = false
         @ping_timer.cancel if @ping_timer
         @ping_timeout_timer.cancel if @ping_timeout_timer
