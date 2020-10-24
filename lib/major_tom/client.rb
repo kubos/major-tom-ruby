@@ -37,6 +37,10 @@ module MajorTom
       @command_block = block
     end
 
+    def on_cancel(&block)
+      @cancel_block = block
+    end
+
     def on_error(&block)
       @error_block = block
     end
@@ -165,6 +169,9 @@ module MajorTom
           command = Command.new(message['command'])
           logger.info("Command: #{command}") if logger
           @command_block.call(command) if @command_block
+        elsif message_type == 'cancel'
+          logger.info("Command cancel from Major Tom: #{message["command"]}") if logger
+          @cancel_block.call(message['command']['id']) if @cancel_block
         elsif message_type == 'error'
           logger.warn("Error from Major Tom: #{message["error"]}") if logger
           @error_block.call(message['error']) if @error_block

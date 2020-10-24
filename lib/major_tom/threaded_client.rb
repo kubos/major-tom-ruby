@@ -28,6 +28,10 @@ module MajorTom
       @command_block = block
     end
 
+    def on_cancel(&block)
+      @cancel_block = block
+    end
+
     def on_error(&block)
       @error_block = block
     end
@@ -117,6 +121,10 @@ module MajorTom
 
             client.on_command do |command|
               @command_block.call(command) if @command_block
+            end
+
+            client.on_cancel do |command_id|
+              @cancel_block.call(command_id) if @cancel_block
             end
 
             client.on_error do |error|
