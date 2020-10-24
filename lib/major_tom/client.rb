@@ -198,10 +198,10 @@ module MajorTom
         @reconnect_timer.cancel if @reconnect_timer
         @ws = nil
 
-        # logger.warn("Reconnecting in 30s") if logger
-        # @reconnect_timer = EventMachine::Timer.new(30) do
-        #   connect! unless @connected
-        # end
+        logger.warn("Reconnecting in 30s") if logger
+        @reconnect_timer = EventMachine::Timer.new(30) do
+          connect! unless @connected
+        end
       end
 
       @ws.on :error do |event|
