@@ -122,6 +122,16 @@ module MajorTom
       )
     end
 
+    def file_list_update(file_list, system = nil)
+      transmit(
+          type: 'file_list',
+          file_list: {
+              system: system || default_fields['system'] || default_fields[:system],
+              files: file_list
+          }
+      )
+    end
+
     def disconnect!
       @ping_timer.cancel if @ping_timer
       @ping_timeout_timer.cancel if @ping_timeout_timer

@@ -90,6 +90,22 @@ module MajorTom
       }
     end
 
+    def file_list_update(file_list, system = nil)
+      @semaphore.synchronize {
+        @command_updates << [
+            "file_list_update",
+            {
+                file_list: file_list,
+                system: system
+            }
+        ]
+        if @command_updates.length > MAX_INTER_THREAD_QUEUE_LENGTH
+          @command_updates.pop
+          logger.warn "Oldest buffered command update discarded due to buffer reaching max size of #{MAX_INTER_THREAD_QUEUE_LENGTH}."
+        end
+      }
+    end
+
     def join
       @thread && @thread.join
     end
@@ -152,9 +168,15 @@ module MajorTom
                 end
 
                 while (command_update = @command_updates.pop)
-                  if command_update[0] == "command_definitions_update"
+                  case command_update[0]
+                  when "command_definitions_update"
                     client.command_definitions_update(
                         command_update[1][:definitions],
+                        command_update[1][:system]
+                    )
+                  when "file_list_update"
+                    client.file_list_update(
+                        command_update[1][:file_list],
                         command_update[1][:system]
                     )
                   else
