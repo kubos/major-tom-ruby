@@ -198,5 +198,9 @@ module MajorTom
         end
       end
     end
+
+    def upload_downlinked_file(temp_file_name, on_sat_filename, command_id, system = nil)
+      client.upload_downlinked_file(temp_file_name, on_sat_filename, command_id, system)
+    end
   end
 end

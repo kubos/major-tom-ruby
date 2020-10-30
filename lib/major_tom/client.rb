@@ -2,6 +2,9 @@ require 'faye/websocket'
 require 'eventmachine'
 require 'json'
 require 'base64'
+require 'digest'
+require 'net/http'
+require 'uri'
 require_relative 'command'
 
 module MajorTom
@@ -219,6 +222,13 @@ module MajorTom
       end
     end
 
+    def upload_downlinked_file(temp_file_name, on_sat_filename, command_id, system = nil)
+      system ||= default_fields['system'] || default_fields[:system]
+      image_upload_data = make_direct_upload_request(on_sat_filename, temp_file_name)
+      do_image_upload(image_upload_data, temp_file_name)
+      confirm_image_upload(image_upload_data, on_sat_filename, system, command_id)
+    end
+
     private
 
       def transmit(message)
@@ -242,6 +252,87 @@ module MajorTom
           transmit(@queue.pop)
           sleep 0.5 # Avoid hitting rate limit
         end
+      end
+
+      def compute_checksum_in_chunks(io)
+        Digest::MD5.new.tap do |checksum|
+          while (chunk = io.read(524288))
+            checksum << chunk
+          end
+          io.close
+        end.base64digest
+      end
+
+      def get_scheme_and_host
+        match = /^(.+):\/\/([^\/]+)\//.match(uri)
+        scheme = match[1] == 'wss' ? 'https' : 'http'
+        return scheme, match[2]
+      end
+
+      def make_direct_upload_request(on_sat_filename, local_filename)
+        scheme, host = get_scheme_and_host
+        uri_object = URI.parse("#{scheme}://#{host}/rails/active_storage/direct_uploads")
+        headers = {
+            'Content-Type' => 'application/json',
+            'X-Gateway-Token' => gateway_token
+        }
+        if basic_auth
+          headers['Authorization'] = "Basic #{Base64.strict_encode64(basic_auth)}"
+        end
+
+        body = {
+            'filename': on_sat_filename,
+            'byte_size': File.size(local_filename),
+            'content_type': 'image/jpeg',
+            'checksum': compute_checksum_in_chunks(File.open(local_filename))
+        }
+
+        http = Net::HTTP.new(uri_object.host, uri_object.port)
+        http.use_ssl = true if scheme == "https"
+        request = Net::HTTP::Post.new(uri_object.request_uri, headers)
+        request.body = body.to_json
+        response = http.request(request)
+        JSON.parse(response.body)
+      end
+
+      def do_image_upload(image_upload_data, temp_file_name)
+        scheme, _ = get_scheme_and_host
+        uri_object = URI.parse(image_upload_data['direct_upload']['url'])
+        header = image_upload_data['direct_upload']['headers']
+        if basic_auth
+          header['Authorization'] = "Basic #{Base64.strict_encode64(basic_auth)}"
+        end
+        http = Net::HTTP.new(uri_object.host, uri_object.port)
+        http.use_ssl = true if scheme == "https"
+        request = Net::HTTP::Put.new(uri_object.request_uri, header)
+        file = File.open(temp_file_name, 'rb')
+        request.body = file.read
+        http.request(request)
+      end
+
+      def confirm_image_upload(image_upload_data, on_sat_filename, system, command_id)
+        scheme, host = get_scheme_and_host
+        uri_object = URI.parse("#{scheme}://#{host}/gateway_api/v1.0/downlinked_files")
+        header = {
+            'Content-Type': 'application/json',
+            'X-Gateway-Token': gateway_token
+        }
+        if basic_auth
+          header['Authorization'] = "Basic #{Base64.strict_encode64(basic_auth)}"
+        end
+
+        body = {
+            'signed_id': image_upload_data['signed_id'],
+            'name': on_sat_filename,
+            'timestamp': Time.now.to_i * 1000,
+            'system': system,
+            'command_id': command_id
+        }
+        http = Net::HTTP.new(uri_object.host, uri_object.port)
+        http.use_ssl = true if scheme == "https"
+        request = Net::HTTP::Post.new(uri_object.request_uri, header)
+        request.body = body.to_json
+        response = http.request(request)
       end
   end
 end
