@@ -296,15 +296,12 @@ module MajorTom
       end
 
       def do_image_upload(image_upload_data, temp_file_name)
-        scheme, _ = get_scheme_and_host
-        uri_object = URI.parse(image_upload_data['direct_upload']['url'])
-        header = image_upload_data['direct_upload']['headers']
-        if basic_auth
-          header['Authorization'] = "Basic #{Base64.strict_encode64(basic_auth)}"
-        end
+        url = image_upload_data['direct_upload']['url']
+        uri_object = URI.parse(url)
+        headers = image_upload_data['direct_upload']['headers']
         http = Net::HTTP.new(uri_object.host, uri_object.port)
-        http.use_ssl = true if scheme == "https"
-        request = Net::HTTP::Put.new(uri_object.request_uri, header)
+        http.use_ssl = true if url.start_with?('https')
+        request = Net::HTTP::Put.new(uri_object.request_uri, headers)
         file = File.open(temp_file_name, 'rb')
         request.body = file.read
         http.request(request)
